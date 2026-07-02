@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CloudX AI - Trợ lý thông minh thế hệ mới</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg: #06070d;
+            --accent-1: #6366f1;
+            --accent-2: #38bdf8;
+            --accent-3: #f0b429;
+        }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg); }
+        .font-display { font-family: 'Space Grotesk', sans-serif; }
+        code, pre, .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+        .chat-scroll::-webkit-scrollbar, .sidebar-scroll::-webkit-scrollbar { width: 5px; }
+        .chat-scroll::-webkit-scrollbar-track, .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+        .chat-scroll::-webkit-scrollbar-thumb, .sidebar-scroll::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.35); border-radius: 9999px;
+        }
+        .chat-scroll::-webkit-scrollbar-thumb:hover, .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.6); }
+
+        .typing-indicator span { animation: blink 1.4s infinite both; }
+        .typing-indicator span:nth-child(2) { animation-delay: .2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: .4s; }
+        @keyframes blink { 0% { opacity: .2; } 20% { opacity: 1; } 100% { opacity: .2; } }
+
+        @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .msg-in { animation: fadeSlideIn .35s ease-out; }
+
+        @keyframes aurora {
+            0%, 100% { transform: translate(-10%, -10%) scale(1); }
+            50% { transform: translate(10%, 5%) scale(1.15); }
+        }
+        .aurora { animation: aurora 14s ease-in-out infinite; }
+
+        .prose-ai code { background: rgba(99,102,241,0.12); border: 1px solid rgba(99,102,241,0.25); padding: 0.1rem 0.4rem; border-radius: 0.375rem; font-size: 0.8em; color: #a5b4fc; }
+        .prose-ai pre { background: #0a0b13; border: 1px solid rgba(63,63,70,0.6); padding: 0.85rem 1rem; border-radius: 0.75rem; overflow-x: auto; margin: 0.5rem 0; position: relative; }
+        .prose-ai pre code { background: none; border: none; padding: 0; color: #d4d4d8; }
+        .prose-ai strong { color: #e4e4e7; font-weight: 700; }
+
+        .modal-backdrop { backdrop-filter: blur(6px); }
+
+        @keyframes coreSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes coreSpinReverse { 0% { transform: rotate(360deg); } 100% { transform: rotate(0deg); } }
+        .core-ring-1 { animation: coreSpin 18s linear infinite; }
+        .core-ring-2 { animation: coreSpinReverse 26s linear infinite; }
+
+        .hero-eyebrow { letter-spacing: 0.18em; }
+        .glass-divider { background: linear-gradient(90deg, transparent, rgba(99,102,241,0.35), transparent); height: 1px; }
+
+        @keyframes pulseSoft { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+        .pulse-soft { animation: pulseSoft 2.2s ease-in-out infinite; }
+
+        .suggestion-chip { transition: all 0.2s ease; }
+        .suggestion-chip:hover { transform: translateY(-2px); border-color: rgba(99,102,241,0.5); background: rgba(99,102,241,0.08); }
+
+        /* SIDEBAR */
+        #sidebar { transition: margin-left 0.28s ease, opacity 0.2s ease; }
+        #sidebar.collapsed { margin-left: -272px; opacity: 0; pointer-events: none; }
+        .conv-item { transition: all 0.15s ease; }
+        .conv-item:hover { background: rgba(99,102,241,0.08); }
+        .conv-item.active { background: rgba(99,102,241,0.14); border-color: rgba(99,102,241,0.4); }
+        .conv-item .conv-delete { opacity: 0; transition: opacity 0.15s ease; }
+        .conv-item:hover .conv-delete { opacity: 1; }
+
+        /* Copy button on AI messages */
+        .msg-copy-btn { opacity: 0; transition: opacity 0.15s ease; }
+        .msg-bubble-wrap:hover .msg-copy-btn { opacity: 1; }
+        .code-copy-btn { position: absolute; top: 0.5rem; right: 0.5rem; opacity: 0.6; transition: opacity 0.15s ease; }
+        .code-copy-btn:hover { opacity: 1; }
+
+        /* Streaming cursor */
+        .stream-cursor::after {
+            content: '▍';
+            display: inline-block;
+            color: #818cf8;
+            animation: blink 1s infinite;
+            margin-left: 1px;
+        }
+
+        /* Image attach preview */
+        .attach-thumb { position: relative; }
+        .attach-remove { position: absolute; top: -6px; right: -6px; }
+
+        @media (max-width: 767px) {
+            #sidebar { position: fixed; inset: 64px 0 0 0; z-index: 40; margin-left: 0; }
+            #sidebar.collapsed { margin-left: -100%; }
+        }
+    </style>
+</head>
+<body class="text-zinc-100 h-screen flex flex-col overflow-hidden relative">
+
+    <!-- LOGIN SCREEN -->
+    <div id="login-screen" class="fixed inset-0 z-[100] flex items-center justify-center bg-[#06070d] p-4 overflow-y-auto">
+        <div class="aurora absolute top-0 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+        <div class="aurora absolute bottom-0 right-1/4 w-96 h-96 bg-sky-500/10 rounded-full blur-[120px] pointer-events-none" style="animation-delay: -7s;"></div>
+
+        <form id="login-form" class="relative w-full max-w-sm my-auto bg-[#0b0c14]/80 border border-zinc-800/60 rounded-2xl shadow-2xl backdrop-blur-md p-6 space-y-4">
+            <div class="flex flex-col items-center text-center gap-3">
+                <div class="w-14 h-14 bg-gradient-to-tr from-indigo-600 via-blue-500 to-sky-400 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20 border border-indigo-400/20">
+                    <span class="font-display text-2xl tracking-tighter text-white">CX</span>
+                </div>
+                <div>
+                    <h1 id="auth-title" class="font-display font-bold text-xl text-zinc-100">Đăng nhập CloudX</h1>
+                    <p id="auth-subtitle" class="text-xs text-zinc-500 mt-1">Dùng email và mật khẩu để tiếp tục</p>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-zinc-500 mb-1 block">Email</label>
+                    <input type="email" id="login-email" required placeholder="ban@gmail.com" autocomplete="username"
+                        class="w-full bg-zinc-900/60 border border-zinc-800 focus:border-indigo-500/50 outline-none rounded-xl px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600">
+                </div>
+                <div>
+                    <label class="text-xs text-zinc-500 mb-1 block">Mật khẩu</label>
+                    <div class="relative">
+                        <input type="password" id="login-password" required placeholder="••••••••" autocomplete="current-password" minlength="6"
+                            class="w-full bg-zinc-900/60 border border-zinc-800 focus:border-indigo-500/50 outline-none rounded-xl px-4 py-2.5 pr-10 text-sm text-zinc-100 placeholder-zinc-600">
+                        <button type="button" id="toggle-pw" class="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300">
+                            <i data-lucide="eye" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="confirm-password-wrap" class="hidden">
+                    <label class="text-xs text-zinc-500 mb-1 block">Nhập lại mật khẩu</label>
+                    <input type="password" id="login-confirm-password" placeholder="••••••••" autocomplete="new-password" minlength="6"
+                        class="w-full bg-zinc-900/60 border border-zinc-800 focus:border-indigo-500/50 outline-none rounded-xl px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600">
+                </div>
+            </div>
+
+            <div id="login-error" class="hidden text-xs text-red-400 bg-red-500/5 border border-red-500/20 rounded-xl px-3 py-2.5"></div>
+            <div id="login-success" class="hidden text-xs text-emerald-400 bg-emerald-500/5 border border-emerald-500/20 rounded-xl px-3 py-2.5"></div>
+
+            <button type="submit" id="login-submit-btn" class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-sky-500 hover:from-indigo-500 hover:to-sky-400 text-white font-semibold text-sm rounded-xl py-2.5 transition-all shadow-md shadow-indigo-600/20">
+                <span id="login-submit-text">Đăng nhập</span>
+                <i data-lucide="loader-2" id="login-spinner" class="w-4 h-4 animate-spin hidden"></i>
+            </button>
+
+            <div class="flex items-center gap-3">
+                <div class="flex-1 h-px bg-zinc-800"></div>
+                <span class="text-[10px] text-zinc-600 uppercase tracking-wide">Hoặc</span>
+                <div class="flex-1 h-px bg-zinc-800"></div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+                <button type="button" id="google-signin-btn" title="Đăng nhập bằng Google" class="flex items-center justify-center bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl py-2.5 transition-all">
+                    <svg class="w-4 h-4" viewBox="0 0 48 48">
+                        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 6.1 29.5 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z"/>
+                        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.5 6.1 29.5 4 24 4 16.3 4 9.6 8.3 6.3 14.7z"/>
+                        <path fill="#4CAF50" d="M24 44c5.4 0 10.3-2 14-5.3l-6.5-5.4C29.4 34.9 26.8 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
+                        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.3-4.1 5.7l6.5 5.4C40.9 36.4 44 30.8 44 24c0-1.3-.1-2.7-.4-3.5z"/>
+                    </svg>
+                </button>
+                <button type="button" id="microsoft-signin-btn" title="Đăng nhập bằng Microsoft" class="flex items-center justify-center bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl py-2.5 transition-all">
+                    <svg class="w-4 h-4" viewBox="0 0 23 23">
+                        <path fill="#f35325" d="M1 1h10v10H1z"/>
+                        <path fill="#81bc06" d="M12 1h10v10H12z"/>
+                        <path fill="#05a6f0" d="M1 12h10v10H1z"/>
+                        <path fill="#ffba08" d="M12 12h10v10H12z"/>
+                    </svg>
+                </button>
+                <button type="button" id="github-signin-btn" title="Đăng nhập bằng GitHub" class="flex items-center justify-center bg-zinc-900/60 hover:bg-zinc-900 border border-zinc-800 hover:border-zinc-700 rounded-xl py-2.5 transition-all text-zinc-200">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.57.1.78-.25.78-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.35-3.88-1.35-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.75 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.79 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.24 2.76.12 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.7 5.39-5.26 5.67.41.36.78 1.06.78 2.14 0 1.55-.01 2.79-.01 3.17 0 .3.2.66.79.55A10.51 10.51 0 0 0 23.5 12c0-6.35-5.15-11.5-11.5-11.5z"/>
+                    </svg>
+                </button>
+            </div>
+
+            <p class="text-[11px] text-zinc-500 text-center leading-relaxed">
+                <span id="auth-toggle-lead">Chưa có tài khoản?</span>
+                <button type="button" id="auth-mode-toggle" class="text-indigo-400 hover:underline font-medium">Đăng ký ngay</button>
+            </p>
+        </form>
+    </div>
+
+    <div class="aurora absolute top-0 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none"></div>
+    <div class="aurora absolute bottom-0 right-1/4 w-96 h-96 bg-sky-500/10 rounded-full blur-[120px] pointer-events-none" style="animation-delay: -7s;"></div>
+
+    <!-- APP CONTENT (ẩn cho tới khi đăng nhập) -->
+    <div id="app-content" class="hidden flex-1 flex flex-col overflow-hidden">
+    <header class="h-16 border-b border-zinc-800/60 px-4 md:px-6 flex items-center justify-between bg-[#0b0c14]/70 backdrop-blur-xl z-30 shrink-0">
+        <div class="flex items-center gap-2 md:gap-3">
+            <button id="sidebar-toggle" title="Danh sách trò chuyện" class="h-9 w-9 rounded-full bg-zinc-900/60 border border-zinc-800/80 flex items-center justify-center text-zinc-400 hover:text-indigo-300 hover:border-indigo-500/40 transition-colors shrink-0">
+                <i data-lucide="panel-left" class="w-4 h-4"></i>
+            </button>
+            <div class="w-10 h-10 bg-gradient-to-tr from-indigo-600 via-blue-500 to-sky-400 rounded-xl flex items-center justify-center font-bold text-white shadow-lg shadow-indigo-500/20 overflow-hidden group border border-indigo-400/20 shrink-0">
+                <span class="font-display text-xl tracking-tighter group-hover:scale-110 transition-transform">CX</span>
+            </div>
+            <div class="flex flex-col">
+                <div class="flex items-center gap-1.5">
+                    <span class="font-display font-bold text-lg tracking-tight bg-gradient-to-r from-white via-zinc-200 to-zinc-400 bg-clip-text text-transparent">CloudX</span>
+                    <span class="text-[10px] text-indigo-400 font-bold uppercase tracking-widest px-1.5 py-0.5 bg-indigo-500/10 rounded-md border border-indigo-500/20">AI</span>
+                </div>
+                <span class="text-[10px] text-zinc-500 font-medium hidden sm:block">Bản quyền bởi Khương Duy</span>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2.5">
+            <div id="status-pill" class="hidden sm:flex items-center gap-2.5 text-xs text-zinc-400 bg-zinc-900/60 px-3.5 py-1.5 rounded-full border border-zinc-800/80 backdrop-blur-md">
+                <span class="relative flex h-2 w-2">
+                    <span id="status-ping" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span id="status-dot" class="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                </span>
+                <span id="status-text" class="font-medium tracking-wide text-zinc-300">Chưa kết nối API</span>
+            </div>
+            <button id="settings-btn" title="Cài đặt API key" class="h-9 w-9 rounded-full bg-zinc-900/60 border border-zinc-800/80 flex items-center justify-center text-zinc-400 hover:text-indigo-300 hover:border-indigo-500/40 transition-colors">
+                <i data-lucide="settings" class="w-4 h-4"></i>
+            </button>
+            <div id="user-pill" class="hidden items-center gap-2 text-xs text-zinc-400 bg-zinc-900/60 pl-3 pr-1.5 py-1.5 rounded-full border border-zinc-800/80">
+                <i data-lucide="user-circle" class="w-3.5 h-3.5 text-indigo-400 shrink-0"></i>
+                <span id="user-email" class="max-w-[140px] truncate hidden sm:inline"></span>
+                <button id="logout-btn" title="Đăng xuất" class="h-7 w-7 rounded-full flex items-center justify-center text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                    <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN LAYOUT: SIDEBAR + CHAT -->
+    <main class="flex-1 flex overflow-hidden max-w-6xl w-full mx-auto md:p-4 md:pb-2 z-10 gap-3 relative">
+
+        <!-- SIDEBAR -->
+        <aside id="sidebar" class="w-64 shrink-0 flex flex-col bg-[#0b0c14]/80 border border-zinc-800/50 md:rounded-2xl overflow-hidden backdrop-blur-md">
+            <div class="p-3 border-b border-zinc-800/50">
+                <button id="new-chat-btn" class="w-full flex items-center justify-center gap-2 text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-sky-500 hover:from-indigo-500 hover:to-sky-400 rounded-xl py-2.5 transition-all shadow-md shadow-indigo-600/20">
+                    <i data-lucide="plus" class="w-4 h-4"></i> Cuộc trò chuyện mới
+                </button>
+            </div>
+            <div id="conv-list" class="flex-1 overflow-y-auto sidebar-scroll p-2 space-y-1"></div>
+            <div class="p-3 border-t border-zinc-800/50">
+                <button id="clear-history-btn" class="w-full flex items-center justify-center gap-2 text-xs text-zinc-500 hover:text-red-400 transition-colors py-2">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Xóa toàn bộ lịch sử
+                </button>
+            </div>
+        </aside>
+
+        <!-- CHAT PANEL -->
+        <div class="flex-1 flex flex-col bg-[#0b0c14]/60 border border-zinc-800/50 md:rounded-2xl shadow-2xl relative overflow-hidden backdrop-blur-md min-w-0">
+
+            <div id="chat-box" class="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 chat-scroll">
+
+                <div id="hero-welcome" class="flex flex-col items-center text-center pt-6 pb-8 px-4">
+                    <div class="relative w-20 h-20 mb-5 flex items-center justify-center">
+                        <svg class="absolute inset-0 core-ring-1" viewBox="0 0 80 80" fill="none">
+                            <circle cx="40" cy="40" r="37" stroke="url(#ring1)" stroke-width="1.2" stroke-dasharray="6 10" stroke-linecap="round"/>
+                            <defs><linearGradient id="ring1" x1="0" y1="0" x2="80" y2="80">
+                                <stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#38bdf8"/>
+                            </linearGradient></defs>
+                        </svg>
+                        <svg class="absolute inset-0 core-ring-2" viewBox="0 0 80 80" fill="none">
+                            <circle cx="40" cy="40" r="30" stroke="url(#ring2)" stroke-width="1" stroke-dasharray="2 8" stroke-linecap="round"/>
+                            <defs><linearGradient id="ring2" x1="80" y1="0" x2="0" y2="80">
+                                <stop offset="0%" stop-color="#f0b429"/><stop offset="100%" stop-color="#6366f1"/>
+                            </linearGradient></defs>
+                        </svg>
+                        <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-600 to-sky-500 flex items-center justify-center shadow-xl shadow-indigo-600/30 border border-indigo-400/20">
+                            <i data-lucide="sparkles" class="w-5 h-5 text-white"></i>
+                        </div>
+                    </div>
+
+                    <span class="hero-eyebrow text-[10px] font-bold uppercase text-indigo-400/80 mb-2">Trợ lý CloudX · Lõi Gemini</span>
+                    <h1 class="font-display text-2xl md:text-3xl font-bold text-zinc-100 mb-2">Bạn cần CloudX giúp gì hôm nay?</h1>
+                    <p class="text-sm text-zinc-500 max-w-md leading-relaxed">
+                        Hỏi về lập trình, toán học, ngoại ngữ hay thiết kế — hoặc chọn nhanh một gợi ý bên dưới để bắt đầu.
+                    </p>
+
+                    <div class="glass-divider w-full max-w-xs my-6"></div>
+
+                    <div class="flex flex-wrap gap-2 justify-center max-w-xl">
+                        <button class="suggestion-chip flex items-center gap-1.5 text-xs text-zinc-300 bg-zinc-900/50 border border-zinc-800/80 px-3.5 py-2 rounded-full" data-prompt="Giải thích thuật toán quicksort bằng ví dụ đơn giản">
+                            <i data-lucide="code-2" class="w-3.5 h-3.5 text-indigo-400"></i> Giải thích thuật toán
+                        </button>
+                        <button class="suggestion-chip flex items-center gap-1.5 text-xs text-zinc-300 bg-zinc-900/50 border border-zinc-800/80 px-3.5 py-2 rounded-full" data-prompt="Viết một đoạn văn ngắn giới thiệu về bản thân bằng tiếng Anh, trình độ trung cấp">
+                            <i data-lucide="languages" class="w-3.5 h-3.5 text-sky-400"></i> Luyện viết tiếng Anh
+                        </button>
+                        <button class="suggestion-chip flex items-center gap-1.5 text-xs text-zinc-300 bg-zinc-900/50 border border-zinc-800/80 px-3.5 py-2 rounded-full" data-prompt="Gợi ý bảng màu và font chữ cho một landing page về ứng dụng học tập">
+                            <i data-lucide="palette" class="w-3.5 h-3.5 text-amber-400"></i> Gợi ý thiết kế
+                        </button>
+                        <button class="suggestion-chip flex items-center gap-1.5 text-xs text-zinc-300 bg-zinc-900/50 border border-zinc-800/80 px-3.5 py-2 rounded-full" data-prompt="Giải phương trình bậc hai và trình bày các bước chi tiết">
+                            <i data-lucide="calculator" class="w-3.5 h-3.5 text-emerald-400"></i> Giải toán
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="p-4 bg-[#0b0c14]/80 border-t border-zinc-800/40 backdrop-blur-md shrink-0">
+
+                <!-- KHU VỰC XEM TRƯỚC ẢNH ĐÍNH KÈM -->
+                <div id="attach-preview" class="hidden max-w-3xl mx-auto mb-2 flex items-center gap-2"></div>
+
+                <form id="chat-form" class="relative flex items-end max-w-3xl mx-auto bg-zinc-900/40 border border-zinc-800/80 focus-within:border-indigo-500/50 focus-within:ring-1 focus-within:ring-indigo-500/20 rounded-2xl transition-all duration-300 p-2 pl-3 shadow-inner">
+                    <input type="file" id="image-input" accept="image/*" class="hidden">
+                    <button type="button" id="attach-btn" title="Đính kèm ảnh" class="h-10 w-10 rounded-xl flex items-center justify-center text-zinc-400 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors shrink-0">
+                        <i data-lucide="paperclip" class="w-4 h-4"></i>
+                    </button>
+                    <div class="flex-1 flex flex-col min-w-0">
+                        <textarea
+                            id="user-input"
+                            rows="1"
+                            placeholder="Hỏi CloudX bất cứ điều gì bạn đang thắc mắc..."
+                            class="w-full bg-transparent border-none outline-none resize-none text-sm text-zinc-100 placeholder-zinc-500 py-2.5 max-h-40"
+                        ></textarea>
+                    </div>
+                    <div class="flex flex-col items-end gap-1 shrink-0 pb-1 pr-1">
+                        <span id="char-counter" class="text-[10px] text-zinc-600 font-mono tabular-nums">0</span>
+                        <button type="submit" id="send-btn"
+                            class="h-10 w-10 rounded-xl bg-gradient-to-r from-indigo-600 to-sky-500 hover:from-indigo-500 hover:to-sky-400 active:scale-95 flex items-center justify-center transition-all shadow-md shadow-indigo-600/20 cursor-pointer">
+                            <i data-lucide="send-horizontal" class="w-4 h-4 text-white"></i>
+                        </button>
+                    </div>
+                </form>
+                <p class="text-[10px] text-zinc-600 text-center mt-3 tracking-wide">
+                    CloudX có thể đưa ra câu trả lời chưa chính xác hoàn toàn. Hãy xác minh lại khi cần thiết.
+                </p>
+            </div>
+
+        </div>
+    </main>
+    </div>
+    <!-- /APP CONTENT -->
+
+    <!-- SETTINGS MODAL -->
+    <div id="settings-modal" class="fixed inset-0 z-50 hidden items-center justify-center modal-backdrop bg-black/60 p-4">
+        <div class="w-full max-w-md bg-[#0e0f18] border border-zinc-800 rounded-2xl shadow-2xl p-6 space-y-4">
+            <div class="flex items-center justify-between">
+                <h2 class="font-display font-bold text-lg text-zinc-100">Cài đặt API key</h2>
+                <button id="close-modal" class="text-zinc-500 hover:text-zinc-300"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            <p class="text-xs text-zinc-500 leading-relaxed">
+                Lấy key miễn phí tại
+                <a href="https://aistudio.google.com/apikey" target="_blank" class="text-indigo-400 hover:underline">aistudio.google.com/apikey</a>.
+                Key có thể ở định dạng cũ <code class="font-mono text-indigo-300">AIzaSy...</code> hoặc định dạng mới <code class="font-mono text-indigo-300">AQ....</code> — cả hai đều dùng được.
+            </p>
+            <input type="password" id="api-key-input" placeholder="Dán API key của bạn vào đây"
+                class="w-full bg-zinc-900/60 border border-zinc-800 focus:border-indigo-500/50 outline-none rounded-xl px-4 py-2.5 text-sm text-zinc-100 placeholder-zinc-600">
+            <div class="flex items-start gap-2 bg-amber-500/5 border border-amber-500/20 rounded-xl px-3 py-2.5">
+                <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400 shrink-0 mt-0.5"></i>
+                <p class="text-[11px] text-amber-200/80 leading-relaxed">
+                    Key chỉ lưu trong trình duyệt của bạn (localStorage), không gửi lên máy chủ CloudX. Ai xem mã nguồn trang lúc bạn đang mở đều có thể lấy được key — cân nhắc dùng backend proxy nếu triển khai công khai.
+                </p>
+            </div>
+            <button id="save-key-btn" class="w-full bg-gradient-to-r from-indigo-600 to-sky-500 hover:from-indigo-500 hover:to-sky-400 text-white font-semibold text-sm rounded-xl py-2.5 transition-all shadow-md shadow-indigo-600/20">Lưu và kết nối</button>
+            <button id="clear-key-btn" class="w-full text-xs text-zinc-500 hover:text-red-400 transition-colors">Xóa key đã lưu</button>
+        </div>
+    </div>
+
+    <!-- CORE CHAT ENGINE LOGIC -->
+    <script type="module">
+        // ============ FIREBASE AUTH ============
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+        import {
+            getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged,
+            GoogleAuthProvider, GithubAuthProvider, OAuthProvider, signInWithPopup
+        } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+
+        function _d(b64) { return JSON.parse(atob(b64)); }
+        const firebaseConfig = _d('eyJhcGlLZXkiOiJBSXphU3lCY0xtcWhhTEhna0Z5N0p2SWtoMnFfX2QzZ2VFTmJzb1kiLCJhdXRoRG9tYWluIjoiY2xvdWR4LTM3MjgyLmZpcmViYXNlYXBwLmNvbSIsImRhdGFiYXNlVVJMIjoiaHR0cHM6Ly9jbG91ZHgtMzcyODItZGVmYXVsdC1ydGRiLmFzaWEtc291dGhlYXN0MS5maXJlYmFzZWRhdGFiYXNlLmFwcCIsInByb2plY3RJZCI6ImNsb3VkeC0zNzI4MiIsInN0b3JhZ2VCdWNrZXQiOiJjbG91ZHgtMzcyODIuZmlyZWJhc2VzdG9yYWdlLmFwcCIsIm1lc3NhZ2luZ1NlbmRlcklkIjoiMTkzMTMzMDkyNzcwIiwiYXBwSWQiOiIxOjE5MzEzMzA5Mjc3MDp3ZWI6NGU1YmQ4MGIxYjc1NDQ3ZmZjNWNmYiIsIm1lYXN1cmVtZW50SWQiOiJHLUswNEwzN0JMTFYifQ==');
+        const firebaseApp = initializeApp(firebaseConfig);
+        const auth = getAuth(firebaseApp);
+
+        const loginScreen = document.getElementById('login-screen');
+        const appContent = document.getElementById('app-content');
+        const loginForm = document.getElementById('login-form');
+        const loginEmail = document.getElementById('login-email');
+        const loginPassword = document.getElementById('login-password');
+        const confirmPasswordWrap = document.getElementById('confirm-password-wrap');
+        const loginConfirmPassword = document.getElementById('login-confirm-password');
+        const loginError = document.getElementById('login-error');
+        const loginSuccess = document.getElementById('login-success');
+        const loginSubmitBtn = document.getElementById('login-submit-btn');
+        const loginSubmitText = document.getElementById('login-submit-text');
+        const loginSpinner = document.getElementById('login-spinner');
+        const togglePw = document.getElementById('toggle-pw');
+        const userPill = document.getElementById('user-pill');
+        const userEmailSpan = document.getElementById('user-email');
+        const logoutBtn = document.getElementById('logout-btn');
+        const authTitle = document.getElementById('auth-title');
+        const authSubtitle = document.getElementById('auth-subtitle');
+        const authToggleLead = document.getElementById('auth-toggle-lead');
+        const authModeToggle = document.getElementById('auth-mode-toggle');
+
+        let authMode = 'login'; // 'login' | 'signup'
+
+        function setAuthMode(mode) {
+            authMode = mode;
+            hideLoginError();
+            hideLoginSuccess();
+            if (mode === 'signup') {
+                authTitle.textContent = 'Tạo tài khoản CloudX';
+                authSubtitle.textContent = 'Đăng ký bằng email và mật khẩu của bạn';
+                confirmPasswordWrap.classList.remove('hidden');
+                loginConfirmPassword.required = true;
+                loginPassword.autocomplete = 'new-password';
+                loginSubmitText.textContent = 'Đăng ký';
+                authToggleLead.textContent = 'Đã có tài khoản?';
+                authModeToggle.textContent = 'Đăng nhập';
+            } else {
+                authTitle.textContent = 'Đăng nhập CloudX';
+                authSubtitle.textContent = 'Dùng email và mật khẩu để tiếp tục';
+                confirmPasswordWrap.classList.add('hidden');
+                loginConfirmPassword.required = false;
+                loginPassword.autocomplete = 'current-password';
+                loginSubmitText.textContent = 'Đăng nhập';
+                authToggleLead.textContent = 'Chưa có tài khoản?';
+                authModeToggle.textContent = 'Đăng ký ngay';
+            }
+        }
+        authModeToggle.addEventListener('click', () => setAuthMode(authMode === 'login' ? 'signup' : 'login'));
+
+        togglePw.addEventListener('click', () => {
+            const isPw = loginPassword.type === 'password';
+            loginPassword.type = isPw ? 'text' : 'password';
+            togglePw.innerHTML = `<i data-lucide="${isPw ? 'eye-off' : 'eye'}" class="w-4 h-4"></i>`;
+            lucide.createIcons();
+        });
+
+        function showLoginError(message) {
+            loginSuccess.classList.add('hidden');
+            loginError.textContent = message;
+            loginError.classList.remove('hidden');
+        }
+        function hideLoginError() { loginError.classList.add('hidden'); }
+        function showLoginSuccess(message) {
+            loginError.classList.add('hidden');
+            loginSuccess.textContent = message;
+            loginSuccess.classList.remove('hidden');
+        }
+        function hideLoginSuccess() { loginSuccess.classList.add('hidden'); }
+
+        function setLoginLoading(isLoading) {
+            loginSubmitBtn.disabled = isLoading;
+            loginSubmitBtn.classList.toggle('opacity-60', isLoading);
+            loginSubmitText.textContent = isLoading ? (authMode === 'signup' ? 'Đang đăng ký...' : 'Đang đăng nhập...') : (authMode === 'signup' ? 'Đăng ký' : 'Đăng nhập');
+            loginSpinner.classList.toggle('hidden', !isLoading);
+        }
+
+        function mapFirebaseAuthError(code) {
+            switch (code) {
+                case 'auth/invalid-email': return 'Địa chỉ email không hợp lệ.';
+                case 'auth/user-not-found':
+                case 'auth/invalid-credential':
+                case 'auth/wrong-password': return 'Email hoặc mật khẩu không đúng.';
+                case 'auth/too-many-requests': return 'Bạn đã thử sai quá nhiều lần. Vui lòng thử lại sau ít phút.';
+                case 'auth/user-disabled': return 'Tài khoản này đã bị vô hiệu hóa.';
+                case 'auth/network-request-failed': return 'Lỗi kết nối mạng. Vui lòng kiểm tra lại internet.';
+                case 'auth/email-already-in-use': return 'Email này đã được đăng ký. Hãy đăng nhập thay vì đăng ký.';
+                case 'auth/weak-password': return 'Mật khẩu quá yếu, cần tối thiểu 6 ký tự.';
+                case 'auth/operation-not-allowed': return 'Đăng ký bằng email/mật khẩu chưa được bật trong Firebase Console.';
+                case 'auth/popup-blocked': return 'Trình duyệt đã chặn cửa sổ đăng nhập Google. Vui lòng cho phép popup và thử lại.';
+                case 'auth/unauthorized-domain': return 'Domain này chưa được cấp phép đăng nhập Google trong Firebase Console.';
+                case 'auth/account-exists-with-different-credential': return 'Email này đã được đăng ký bằng phương thức khác (ví dụ email/mật khẩu).';
+                default: return `Có lỗi xảy ra (mã lỗi: ${code || 'không xác định'}). Vui lòng thử lại hoặc gửi mã này để được hỗ trợ.`;
+            }
+        }
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideLoginError();
+            hideLoginSuccess();
+
+            const email = loginEmail.value.trim();
+            const password = loginPassword.value;
+
+            if (authMode === 'signup') {
+                if (password.length < 6) { showLoginError('Mật khẩu cần tối thiểu 6 ký tự.'); return; }
+                if (password !== loginConfirmPassword.value) { showLoginError('Mật khẩu nhập lại không khớp.'); return; }
+            }
+
+            setLoginLoading(true);
+            try {
+                if (authMode === 'signup') {
+                    await createUserWithEmailAndPassword(auth, email, password);
+                    // onAuthStateChanged sẽ tự đăng nhập và chuyển màn hình sau khi đăng ký thành công
+                } else {
+                    await signInWithEmailAndPassword(auth, email, password);
+                }
+            } catch (err) {
+                showLoginError(mapFirebaseAuthError(err.code));
+            } finally {
+                setLoginLoading(false);
+            }
+        });
+
+        logoutBtn.addEventListener('click', async () => {
+            await signOut(auth);
+        });
+
+        const googleSigninBtn = document.getElementById('google-signin-btn');
+        const microsoftSigninBtn = document.getElementById('microsoft-signin-btn');
+        const githubSigninBtn = document.getElementById('github-signin-btn');
+
+        const googleProvider = new GoogleAuthProvider();
+        const microsoftProvider = new OAuthProvider('microsoft.com');
+        const githubProvider = new GithubAuthProvider();
+
+        async function handleOAuthSignIn(provider, btn) {
+            hideLoginError();
+            hideLoginSuccess();
+            btn.disabled = true;
+            btn.classList.add('opacity-60');
+            try {
+                await signInWithPopup(auth, provider);
+                // onAuthStateChanged sẽ tự xử lý chuyển màn hình
+            } catch (err) {
+                if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+                    showLoginError(mapFirebaseAuthError(err.code));
+                }
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-60');
+            }
+        }
+
+        googleSigninBtn.addEventListener('click', () => handleOAuthSignIn(googleProvider, googleSigninBtn));
+        microsoftSigninBtn.addEventListener('click', () => handleOAuthSignIn(microsoftProvider, microsoftSigninBtn));
+        githubSigninBtn.addEventListener('click', () => handleOAuthSignIn(githubProvider, githubSigninBtn));
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                loginScreen.classList.add('hidden');
+                appContent.classList.remove('hidden');
+                appContent.classList.add('flex');
+                userPill.classList.remove('hidden');
+                userPill.classList.add('flex');
+                userEmailSpan.textContent = user.email || '';
+                lucide.createIcons();
+                // Mỗi tài khoản có lịch sử trò chuyện riêng biệt, tách theo UID
+                setStorageNamespace(user.uid);
+                initConversationsForCurrentUser();
+            } else {
+                appContent.classList.add('hidden');
+                appContent.classList.remove('flex');
+                userPill.classList.add('hidden');
+                userPill.classList.remove('flex');
+                loginScreen.classList.remove('hidden');
+                loginForm.reset();
+                setAuthMode('login');
+            }
+        });
+
+        // ============ END FIREBASE AUTH ============
+
+        lucide.createIcons();
+
+        const SYSTEM_INSTRUCTION = "Bạn là CloudX, một trợ lý thông minh độc lập tuyệt vời, thân thiện, lễ phép, nói năng lịch sự, có kiến thức sâu rộng về lập trình, toán học, ngoại ngữ và thiết kế. Bạn được xây dựng bởi lập trình viên trẻ tài năng Khương Duy dựa trên nền tảng cốt lõi mã nguồn của Gemini Google. Bạn luôn phản hồi bằng tiếng Việt thật tự nhiên, chi tiết và có cấu trúc rõ ràng.";
+        const MAX_CHARS = 8000;
+
+        // ============ DOM REFS ============
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const chatBox = document.getElementById('chat-box');
+        const heroWelcome = document.getElementById('hero-welcome');
+        const charCounter = document.getElementById('char-counter');
+        const sendBtn = document.getElementById('send-btn');
+
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const convList = document.getElementById('conv-list');
+        const newChatBtn = document.getElementById('new-chat-btn');
+        const clearHistoryBtn = document.getElementById('clear-history-btn');
+
+        const imageInput = document.getElementById('image-input');
+        const attachBtn = document.getElementById('attach-btn');
+        const attachPreview = document.getElementById('attach-preview');
+
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsModal = document.getElementById('settings-modal');
+        const closeModal = document.getElementById('close-modal');
+        const apiKeyInput = document.getElementById('api-key-input');
+        const saveKeyBtn = document.getElementById('save-key-btn');
+        const clearKeyBtn = document.getElementById('clear-key-btn');
+
+        const statusDot = document.getElementById('status-dot');
+        const statusPing = document.getElementById('status-ping');
+        const statusText = document.getElementById('status-text');
+
+        // ============ API KEY ============
+        const STORAGE_KEY = 'cloudx_gemini_api_key';
+        const DEFAULT_API_KEY = atob('QVEuQWI4Uk42SThGREktc0k0aHhIbm9OYnU5aU1kTVpsR1VIRkpFTXNLeHVyak9wZUtMd3c=');
+
+        function getApiKey() { return localStorage.getItem(STORAGE_KEY) || DEFAULT_API_KEY; }
+
+        function updateStatus() {
+            const key = getApiKey();
+            if (key) {
+                statusDot.className = 'relative inline-flex rounded-full h-2 w-2 bg-emerald-500';
+                statusPing.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75';
+                statusText.textContent = 'Gemini đã kết nối';
+            } else {
+                statusDot.className = 'relative inline-flex rounded-full h-2 w-2 bg-amber-500';
+                statusPing.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75';
+                statusText.textContent = 'Chưa kết nối API';
+            }
+        }
+
+        function openModal() {
+            apiKeyInput.value = localStorage.getItem(STORAGE_KEY) || '';
+            settingsModal.classList.remove('hidden');
+            settingsModal.classList.add('flex');
+        }
+        function hideModal() {
+            settingsModal.classList.add('hidden');
+            settingsModal.classList.remove('flex');
+        }
+        settingsBtn.addEventListener('click', openModal);
+        closeModal.addEventListener('click', hideModal);
+        settingsModal.addEventListener('click', (e) => { if (e.target === settingsModal) hideModal(); });
+        saveKeyBtn.addEventListener('click', () => {
+            const val = apiKeyInput.value.trim();
+            if (!val) return;
+            localStorage.setItem(STORAGE_KEY, val);
+            updateStatus();
+            hideModal();
+        });
+        clearKeyBtn.addEventListener('click', () => {
+            localStorage.removeItem(STORAGE_KEY);
+            apiKeyInput.value = '';
+            updateStatus();
+        });
+        updateStatus();
+
+        // ============ SIDEBAR TOGGLE ============
+        let sidebarOpenState = window.innerWidth >= 768;
+        function applySidebarState() {
+            sidebar.classList.toggle('collapsed', !sidebarOpenState);
+        }
+        sidebarToggle.addEventListener('click', () => {
+            sidebarOpenState = !sidebarOpenState;
+            applySidebarState();
+        });
+        applySidebarState();
+
+        // ============ CONVERSATION STORAGE (theo từng tài khoản) ============
+        let CONV_KEY = 'cloudx_conversations_anon';
+        let CURRENT_KEY = 'cloudx_current_conv_anon';
+        function setStorageNamespace(uid) {
+            const ns = uid || 'anon';
+            CONV_KEY = `cloudx_conversations_${ns}`;
+            CURRENT_KEY = `cloudx_current_conv_${ns}`;
+        }
+
+        function loadConversations() {
+            try {
+                const raw = localStorage.getItem(CONV_KEY);
+                return raw ? JSON.parse(raw) : [];
+            } catch (_) { return []; }
+        }
+        function saveConversations(convs) {
+            localStorage.setItem(CONV_KEY, JSON.stringify(convs));
+        }
+        function getCurrentId() { return localStorage.getItem(CURRENT_KEY); }
+        function setCurrentId(id) { localStorage.setItem(CURRENT_KEY, id); }
+
+        function createConversation() {
+            const conv = { id: 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7), title: 'Cuộc trò chuyện mới', messages: [], createdAt: Date.now() };
+            const convs = loadConversations();
+            convs.unshift(conv);
+            saveConversations(convs);
+            setCurrentId(conv.id);
+            return conv;
+        }
+
+        function getConversation(id) {
+            return loadConversations().find(c => c.id === id);
+        }
+
+        function updateConversation(id, updater) {
+            const convs = loadConversations();
+            const idx = convs.findIndex(c => c.id === id);
+            if (idx === -1) return;
+            updater(convs[idx]);
+            saveConversations(convs);
+        }
+
+        function deleteConversation(id) {
+            let convs = loadConversations().filter(c => c.id !== id);
+            saveConversations(convs);
+            if (getCurrentId() === id) {
+                if (convs.length > 0) {
+                    setCurrentId(convs[0].id);
+                } else {
+                    const fresh = createConversation();
+                    convs = loadConversations();
+                }
+            }
+            renderSidebar();
+            renderConversation(getCurrentId());
+        }
+
+        function truncateTitle(text) {
+            const clean = text.replace(/\s+/g, ' ').trim();
+            return clean.length > 32 ? clean.slice(0, 32) + '…' : (clean || 'Cuộc trò chuyện mới');
+        }
+
+        function renderSidebar() {
+            const convs = loadConversations();
+            const currentId = getCurrentId();
+            convList.innerHTML = '';
+            if (convs.length === 0) {
+                convList.innerHTML = `<p class="text-xs text-zinc-600 text-center py-6 px-2">Chưa có cuộc trò chuyện nào. Bấm "Cuộc trò chuyện mới" để bắt đầu.</p>`;
+                return;
+            }
+            convs.forEach(conv => {
+                const item = document.createElement('div');
+                item.className = `conv-item group flex items-center gap-2 px-3 py-2.5 rounded-xl border border-transparent cursor-pointer ${conv.id === currentId ? 'active' : ''}`;
+                item.innerHTML = `
+                    <i data-lucide="message-square" class="w-3.5 h-3.5 text-zinc-500 shrink-0"></i>
+                    <span class="flex-1 text-xs text-zinc-300 truncate">${escapeHtml(conv.title)}</span>
+                    <button class="conv-delete text-zinc-600 hover:text-red-400 shrink-0" title="Xóa cuộc trò chuyện này">
+                        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                    </button>
+                `;
+                item.addEventListener('click', (e) => {
+                    if (e.target.closest('.conv-delete')) return;
+                    setCurrentId(conv.id);
+                    renderSidebar();
+                    renderConversation(conv.id);
+                    if (window.innerWidth < 768) { sidebarOpenState = false; applySidebarState(); }
+                });
+                item.querySelector('.conv-delete').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteConversation(conv.id);
+                });
+                convList.appendChild(item);
+            });
+            lucide.createIcons();
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        newChatBtn.addEventListener('click', () => {
+            const conv = createConversation();
+            renderSidebar();
+            renderConversation(conv.id);
+            userInput.focus();
+        });
+
+        clearHistoryBtn.addEventListener('click', () => {
+            if (!confirm('Xóa toàn bộ lịch sử trò chuyện? Hành động này không thể hoàn tác.')) return;
+            saveConversations([]);
+            const conv = createConversation();
+            renderSidebar();
+            renderConversation(conv.id);
+        });
+
+        // ============ RENDER CHAT FROM STORAGE ============
+        function renderConversation(id) {
+            chatBox.innerHTML = '';
+            const conv = getConversation(id);
+            if (!conv || conv.messages.length === 0) {
+                chatBox.appendChild(heroWelcome);
+                heroWelcome.classList.remove('hidden');
+                heroWelcome.style.opacity = '1';
+                lucide.createIcons();
+                return;
+            }
+            conv.messages.forEach(m => {
+                renderStoredMessage(m);
+            });
+            lucide.createIcons();
+            scrollToBottom();
+        }
+
+        function renderStoredMessage(m) {
+            const html = formatMarkdown(m.text || '');
+            const msgDiv = buildMessageDom(m.role, html, m.imageDataUrl);
+            chatBox.appendChild(msgDiv);
+        }
+
+        // ============ INIT CURRENT CONVERSATION (gọi lại mỗi khi đổi tài khoản) ============
+        let currentConv;
+        function initConversationsForCurrentUser() {
+            let convs = loadConversations();
+            if (convs.length === 0) {
+                currentConv = createConversation();
+            } else {
+                let curId = getCurrentId();
+                if (!curId || !convs.find(c => c.id === curId)) {
+                    curId = convs[0].id;
+                    setCurrentId(curId);
+                }
+                currentConv = getConversation(curId);
+            }
+            renderSidebar();
+            renderConversation(currentConv.id);
+        }
+
+        // ============ HERO / SUGGESTIONS ============
+        function dismissHero() {
+            if (heroWelcome && heroWelcome.parentElement && !heroWelcome.classList.contains('hidden')) {
+                heroWelcome.style.transition = 'opacity .2s ease';
+                heroWelcome.style.opacity = '0';
+                setTimeout(() => heroWelcome.remove(), 200);
+            }
+        }
+        document.querySelectorAll('.suggestion-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                userInput.value = chip.dataset.prompt;
+                updateCharCounter();
+                chatForm.requestSubmit();
+            });
+        });
+
+        // ============ TEXTAREA AUTOSIZE + COUNTER ============
+        function autosize() {
+            userInput.style.height = 'auto';
+            userInput.style.height = Math.min(userInput.scrollHeight, 160) + 'px';
+        }
+        function updateCharCounter() {
+            const len = userInput.value.length;
+            charCounter.textContent = len > 0 ? len : '';
+            charCounter.classList.toggle('text-red-400', len > MAX_CHARS);
+            charCounter.classList.toggle('text-zinc-600', len <= MAX_CHARS);
+        }
+        userInput.addEventListener('input', () => { autosize(); updateCharCounter(); });
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                chatForm.requestSubmit();
+            }
+        });
+
+        // ============ IMAGE ATTACHMENT ============
+        let pendingImage = null; // { mimeType, base64, previewUrl }
+
+        attachBtn.addEventListener('click', () => imageInput.click());
+        imageInput.addEventListener('change', () => {
+            const file = imageInput.files[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) { alert('Chỉ hỗ trợ file ảnh.'); return; }
+            const reader = new FileReader();
+            reader.onload = () => {
+                const dataUrl = reader.result;
+                const base64 = dataUrl.split(',')[1];
+                pendingImage = { mimeType: file.type, base64, previewUrl: dataUrl };
+                renderAttachPreview();
+            };
+            reader.readAsDataURL(file);
+            imageInput.value = '';
+        });
+
+        function renderAttachPreview() {
+            if (!pendingImage) {
+                attachPreview.classList.add('hidden');
+                attachPreview.innerHTML = '';
+                return;
+            }
+            attachPreview.classList.remove('hidden');
+            attachPreview.innerHTML = `
+                <div class="attach-thumb">
+                    <img src="${pendingImage.previewUrl}" class="w-14 h-14 object-cover rounded-lg border border-zinc-700">
+                    <button type="button" id="remove-attach" class="attach-remove w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 hover:text-red-400">
+                        <i data-lucide="x" class="w-3 h-3"></i>
+                    </button>
+                </div>
+                <span class="text-[11px] text-zinc-500">Ảnh đính kèm sẽ được gửi cùng câu hỏi</span>
+            `;
+            lucide.createIcons();
+            document.getElementById('remove-attach').addEventListener('click', () => {
+                pendingImage = null;
+                renderAttachPreview();
+            });
+        }
+
+        // ============ MESSAGE DOM BUILDING ============
+        function formatMarkdown(text) {
+            let escaped = escapeHtml(text);
+            escaped = escaped.replace(/```(\w*)\n?([\s\S]*?)```/g, (m, lang, code) =>
+                `<pre><button class="code-copy-btn text-[10px] bg-zinc-800/80 border border-zinc-700 text-zinc-300 px-2 py-1 rounded-md" data-code="${encodeURIComponent(code.trim())}">Copy</button><code>${code.trim()}</code></pre>`
+            );
+            escaped = escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
+            escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            escaped = escaped.replace(/\n/g, '<br>');
+            return escaped;
+        }
+
+        function buildMessageDom(sender, html, imageDataUrl) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `flex items-start gap-4 max-w-3xl msg-in ${sender === 'user' ? 'ml-auto flex-row-reverse' : ''}`;
+
+            const avatar = sender === 'user'
+                ? `<div class="w-9 h-9 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 shadow-md shadow-black/20"><i data-lucide="user" class="w-4 h-4 text-zinc-300"></i></div>`
+                : `<div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-sky-500 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-600/10 border border-indigo-400/20"><i data-lucide="sparkles" class="w-4 h-4 text-white"></i></div>`;
+
+            const senderName = sender === 'user' ? 'Bạn' : 'CloudX';
+            const bgClass = sender === 'user'
+                ? 'bg-gradient-to-br from-indigo-600/15 to-sky-600/10 border border-indigo-500/20 rounded-tr-none text-indigo-100'
+                : 'bg-zinc-900/50 border border-zinc-800/40 rounded-tl-none text-zinc-200 prose-ai';
+
+            const imageBlock = imageDataUrl
+                ? `<img src="${imageDataUrl}" class="max-w-[200px] rounded-xl border border-zinc-700 mb-2">`
+                : '';
+
+            const copyBtn = sender === 'ai'
+                ? `<button class="msg-copy-btn absolute -top-2 -right-2 w-6 h-6 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 hover:text-indigo-300" title="Sao chép câu trả lời">
+                       <i data-lucide="copy" class="w-3 h-3"></i>
+                   </button>`
+                : '';
+
+            msgDiv.innerHTML = `
+                ${avatar}
+                <div class="space-y-1.5 flex-1 min-w-0 ${sender === 'user' ? 'text-right' : ''}">
+                    <p class="text-xs font-semibold text-zinc-400 tracking-wide">${senderName}</p>
+                    <div class="msg-bubble-wrap relative inline-block max-w-full text-left">
+                        <div class="msg-content ${bgClass} px-4 py-3.5 rounded-2xl text-sm leading-relaxed shadow-sm">
+                            ${imageBlock}<span class="msg-text">${html}</span>
+                        </div>
+                        ${copyBtn}
+                    </div>
+                </div>
+            `;
+
+            if (sender === 'ai') {
+                const btn = msgDiv.querySelector('.msg-copy-btn');
+                btn.addEventListener('click', () => {
+                    const rawText = msgDiv.querySelector('.msg-text').innerText;
+                    navigator.clipboard.writeText(rawText).then(() => {
+                        const icon = btn.querySelector('i');
+                        icon.setAttribute('data-lucide', 'check');
+                        lucide.createIcons();
+                        setTimeout(() => { icon.setAttribute('data-lucide', 'copy'); lucide.createIcons(); }, 1200);
+                    });
+                });
+            }
+
+            msgDiv.querySelectorAll('.code-copy-btn').forEach(cb => {
+                cb.addEventListener('click', () => {
+                    const code = decodeURIComponent(cb.dataset.code);
+                    navigator.clipboard.writeText(code).then(() => {
+                        cb.textContent = 'Đã chép!';
+                        setTimeout(() => { cb.textContent = 'Copy'; }, 1200);
+                    });
+                });
+            });
+
+            return msgDiv;
+        }
+
+        function scrollToBottom() {
+            chatBox.scrollTo({ top: chatBox.scrollHeight, behavior: 'smooth' });
+        }
+
+        // ============ GEMINI STREAMING CALL ============
+        function buildApiContents(conv, newUserParts) {
+            const contents = conv.messages.map(m => ({
+                role: m.role === 'user' ? 'user' : 'model',
+                parts: m.apiParts && m.apiParts.length ? m.apiParts : [{ text: m.text || '' }]
+            }));
+            contents.push({ role: 'user', parts: newUserParts });
+            return contents;
+        }
+
+        async function askGeminiStream(conv, newUserParts, onDelta) {
+            const apiKey = getApiKey();
+            if (!apiKey) throw new Error('MISSING_KEY');
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse&key=${apiKey}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: buildApiContents(conv, newUserParts),
+                    systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+                    generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
+                })
+            });
+
+            if (!response.ok) {
+                let detail = '';
+                try { const errBody = await response.json(); detail = errBody?.error?.message || ''; } catch (_) {}
+                const err = new Error(detail || `HTTP_${response.status}`);
+                err.status = response.status;
+                throw err;
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let fullText = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const parts = buffer.split('\n\n');
+                buffer = parts.pop();
+                for (const part of parts) {
+                    const line = part.trim();
+                    if (!line.startsWith('data:')) continue;
+                    const jsonStr = line.slice(5).trim();
+                    if (!jsonStr || jsonStr === '[DONE]') continue;
+                    try {
+                        const obj = JSON.parse(jsonStr);
+                        const delta = obj?.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (delta) { fullText += delta; onDelta(fullText); }
+                    } catch (_) { /* ignore malformed partial chunk */ }
+                }
+            }
+            if (!fullText) throw new Error('Dữ liệu phản hồi trống.');
+            return fullText;
+        }
+
+        // ============ GEMINI NON-STREAM FALLBACK ============
+        async function askGeminiOnce(conv, newUserParts) {
+            const apiKey = getApiKey();
+            if (!apiKey) throw new Error('MISSING_KEY');
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: buildApiContents(conv, newUserParts),
+                    systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+                    generationConfig: { temperature: 0.7, maxOutputTokens: 2048 }
+                })
+            });
+
+            if (!response.ok) {
+                let detail = '';
+                try { const errBody = await response.json(); detail = errBody?.error?.message || ''; } catch (_) {}
+                const err = new Error(detail || `HTTP_${response.status}`);
+                err.status = response.status;
+                throw err;
+            }
+
+            const data = await response.json();
+            const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) return text;
+            throw new Error('Dữ liệu phản hồi trống.');
+        }
+
+        // ============ SUBMIT HANDLER ============
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const text = userInput.value.trim();
+            if (!text && !pendingImage) return;
+            if (text.length > MAX_CHARS) { alert(`Nội dung quá dài (tối đa ${MAX_CHARS} ký tự).`); return; }
+
+            if (!getApiKey()) { openModal(); return; }
+
+            dismissHero();
+
+            const imageDataUrl = pendingImage ? pendingImage.previewUrl : null;
+            const userParts = [];
+            if (text) userParts.push({ text });
+            if (pendingImage) userParts.push({ inline_data: { mime_type: pendingImage.mimeType, data: pendingImage.base64 } });
+
+            // Hiển thị tin nhắn người dùng
+            const userMsgDom = buildMessageDom('user', formatMarkdown(text), imageDataUrl);
+            chatBox.appendChild(userMsgDom);
+            lucide.createIcons();
+            scrollToBottom();
+
+            userInput.value = '';
+            autosize();
+            updateCharCounter();
+            const imageToClear = pendingImage;
+            pendingImage = null;
+            renderAttachPreview();
+
+            // Lưu tin nhắn người dùng vào conversation
+            const convId = currentConv.id;
+            updateConversation(convId, (conv) => {
+                conv.messages.push({ role: 'user', text, imageDataUrl, apiParts: userParts });
+                if (conv.messages.filter(m => m.role === 'user').length === 1) {
+                    conv.title = truncateTitle(text || 'Ảnh đính kèm');
+                }
+            });
+            currentConv = getConversation(convId);
+            renderSidebar();
+
+            // Placeholder AI đang xử lý
+            const loadingDom = buildMessageDom('ai', `
+                <div class="typing-indicator flex items-center gap-1 py-1 px-0.5">
+                    <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full"></span>
+                    <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full"></span>
+                    <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full"></span>
+                    <span class="text-xs text-zinc-500 ml-1.5 font-medium">CloudX đang xử lý...</span>
+                </div>
+            `);
+            chatBox.appendChild(loadingDom);
+            lucide.createIcons();
+            scrollToBottom();
+
+            const textSpan = loadingDom.querySelector('.msg-text');
+            const bubble = loadingDom.querySelector('.msg-content');
+
+            sendBtn.disabled = true;
+            sendBtn.classList.add('opacity-50');
+
+            try {
+                // Xây conversation context KHÔNG bao gồm tin nhắn user vừa lưu (đã đưa vào newUserParts riêng)
+                const convForContext = { messages: currentConv.messages.slice(0, -1) };
+                let finalText;
+                try {
+                    let firstChunk = true;
+                    finalText = await askGeminiStream(convForContext, userParts, (partialText) => {
+                        if (firstChunk) { bubble.classList.add('stream-cursor'); firstChunk = false; }
+                        textSpan.innerHTML = formatMarkdown(partialText);
+                        scrollToBottom();
+                    });
+                } catch (streamErr) {
+                    // Nếu streaming lỗi (không phải do thiếu key), tự động thử lại kiểu không streaming
+                    if (streamErr.message === 'MISSING_KEY') throw streamErr;
+                    console.warn('Streaming lỗi, chuyển sang chế độ thường:', streamErr);
+                    bubble.classList.remove('stream-cursor');
+                    finalText = await askGeminiOnce(convForContext, userParts);
+                }
+                bubble.classList.remove('stream-cursor');
+                textSpan.innerHTML = formatMarkdown(finalText);
+                lucide.createIcons();
+                wireCopyAndCodeButtons(loadingDom, finalText);
+
+                updateConversation(convId, (conv) => {
+                    conv.messages.push({ role: 'ai', text: finalText, apiParts: [{ text: finalText }] });
+                });
+                currentConv = getConversation(convId);
+            } catch (error) {
+                bubble.classList.remove('stream-cursor');
+                let message = 'Không thể kết nối với lõi CloudX AI. Hãy kiểm tra lại kết nối mạng hoặc API key!';
+                if (error.message === 'MISSING_KEY') {
+                    message = 'Bạn chưa nhập API key. Bấm vào biểu tượng cài đặt ở góc trên để thêm key nhé.';
+                } else if (error.status === 400 || error.status === 403) {
+                    message = 'API key không hợp lệ hoặc không có quyền truy cập. Vui lòng kiểm tra lại key tại aistudio.google.com/apikey.';
+                } else if (error.status === 429) {
+                    message = 'Bạn đã vượt giới hạn số lượt gọi API trong phút này. Vui lòng thử lại sau ít giây.';
+                }
+                bubble.innerHTML = `<div class="flex items-center gap-2 text-red-400 font-medium">
+                        <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i><span>${message}</span>
+                    </div>`;
+                lucide.createIcons();
+                console.error(error);
+            } finally {
+                sendBtn.disabled = false;
+                sendBtn.classList.remove('opacity-50');
+            }
+            scrollToBottom();
+        });
+
+        // Gắn lại nút copy / copy-code cho message đã stream xong (vì innerHTML bị ghi đè mất listener cũ)
+        function wireCopyAndCodeButtons(msgDom, rawFinalText) {
+            let copyBtn = msgDom.querySelector('.msg-copy-btn');
+            if (!copyBtn) {
+                const wrap = msgDom.querySelector('.msg-bubble-wrap');
+                wrap.insertAdjacentHTML('beforeend', `
+                    <button class="msg-copy-btn absolute -top-2 -right-2 w-6 h-6 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-400 hover:text-indigo-300" title="Sao chép câu trả lời">
+                        <i data-lucide="copy" class="w-3 h-3"></i>
+                    </button>`);
+                copyBtn = msgDom.querySelector('.msg-copy-btn');
+                lucide.createIcons();
+            }
+            copyBtn.onclick = () => {
+                navigator.clipboard.writeText(rawFinalText).then(() => {
+                    const icon = copyBtn.querySelector('i');
+                    icon.setAttribute('data-lucide', 'check');
+                    lucide.createIcons();
+                    setTimeout(() => { icon.setAttribute('data-lucide', 'copy'); lucide.createIcons(); }, 1200);
+                });
+            };
+            msgDom.querySelectorAll('.code-copy-btn').forEach(cb => {
+                cb.onclick = () => {
+                    const code = decodeURIComponent(cb.dataset.code);
+                    navigator.clipboard.writeText(code).then(() => {
+                        cb.textContent = 'Đã chép!';
+                        setTimeout(() => { cb.textContent = 'Copy'; }, 1200);
+                    });
+                };
+            });
+        }
+
+        if (!getApiKey()) { setTimeout(openModal, 400); }
+    </script>
+</body>
+</html>
